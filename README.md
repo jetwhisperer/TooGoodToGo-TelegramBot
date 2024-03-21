@@ -34,10 +34,25 @@ Start the Python script
    python3 Telegram.py
    ```
 
+### Docker usage
+If using Docker, install requirements and start the bot with:
+
+```
+docker compose up --build -d
+```
+
+If needed, see logs with:
+
+```
+docker logs toogoodtogobot -t -f --tail 1000
+```
+
+To stop the bot:
+
+```
+docker compose down
+```
+
 ## Credits goes to
 [@TGTG](https://www.toogoodtogo.com/)
 [@ahivert](https://github.com/ahivert/tgtg-python)
-
-
-
-

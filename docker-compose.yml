@@ -1,0 +1,10 @@
+name: toogoodtogo-telegrambot
+
+services:
+  toogoodtogobot:
+    build: .
+    image: toogoodtogobot:latest
+    container_name: toogoodtogobot
+    restart: unless-stopped
+    volumes:
+      - .:/usr/src/TooGoodToGo-TelegramBot
