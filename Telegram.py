@@ -14,11 +14,15 @@ token = config['Telegram']['token']
 bot = AsyncTeleBot(token)
 tooGoodToGo = TooGoodToGo(token)
 
+def log_command(chat_id: int, command: str, log: str = ''):
+    print("/", command, (f": {log}" if log else ''), " [", chat_id, "]")
 
 # Handle '/start' and '/help'
 @bot.message_handler(commands=['help', 'start'])
 async def send_welcome(message):
-    await bot.send_message(message.chat.id,
+    chat_id = str(message.chat.id)
+    log_command(chat_id, 'help')
+    await bot.send_message(chat_id,
                            """
 *Hi welcome to the TGTG Bot:*
 
@@ -43,6 +47,7 @@ _🌐 You can find more information about Too Good To Go_ [here](https://www.too
 @bot.message_handler(commands=['info'])
 async def send_info(message):
     chat_id = str(message.chat.id)
+    log_command(chat_id, 'info')
     credentials = tooGoodToGo.find_credentials_by_telegramUserID(chat_id)
     if credentials is None:
         await bot.send_message(chat_id=chat_id,
@@ -57,18 +62,21 @@ async def send_login(message):
     chat_id = str(message.chat.id)
     credentials = tooGoodToGo.find_credentials_by_telegramUserID(chat_id)
     if not credentials is None:
+        log_command(chat_id, 'login', 'Logged in')
         await bot.send_message(chat_id=chat_id, text="👍 You are always logged in!")
         return None
     email = message.text.replace('/login', '').lstrip()
-    print(email, "  ", chat_id)
 
     if re.match(r"[^@]+@[^@]+\.[^@]+", email):
-        await bot.send_message(chat_id=chat_id, text="📩 Please open your mail account"
-                                                     "\nYou will then receive an email with a confirmation link."
-                                                     "\n*You must open the link in your browser!*"
+        log_command(chat_id, 'login', email)
+        await bot.send_message(chat_id=chat_id, text="📩 Please open your mail account."
+                                                     "\nYou will receive an email with a confirmation link."
+                                                     "\n_Opening email on mobile won't work if you have installed TooGoodToGo app._\n"
+                                                     "\n*You must open the link in your PC browser.*"
                                                      "\n_You do not need to enter a password._", parse_mode="markdown")
         start_new_thread(tooGoodToGo.new_user, (chat_id, email))
     else:
+        log_command(chat_id, 'login', f'{email} (Invalid)')
         await bot.send_message(chat_id=chat_id,
                                text="*⚠️ No valid mail address ⚠️*"
                                     "\nPlease enter */login email@example.com*"
@@ -82,35 +90,35 @@ def inline_keyboard_markup(chat_id):
         keyboard=[
             [
                 types.InlineKeyboardButton(
-                    text=("🟢" if tooGoodToGo.users_settings_data[chat_id]["sold_out"] else "🔴") + " sold out",
+                    text=("🟢" if tooGoodToGo.users_settings_data[chat_id]["sold_out"] else "🔴") + " Sold out",
                     callback_data="sold_out"
                 ),
                 types.InlineKeyboardButton(
-                    text=("🟢" if tooGoodToGo.users_settings_data[chat_id]["new_stock"] else "🔴") + " new stock",
+                    text=("🟢" if tooGoodToGo.users_settings_data[chat_id]["new_stock"] else "🔴") + " New stock",
                     callback_data="new_stock"
                 )
             ],
             [
                 types.InlineKeyboardButton(
-                    text=("🟢" if tooGoodToGo.users_settings_data[chat_id]["stock_reduced"] else "🔴") + " stock reduced",
+                    text=("🟢" if tooGoodToGo.users_settings_data[chat_id]["stock_reduced"] else "🔴") + " Stock reduced",
                     callback_data="stock_reduced"
                 ),
                 types.InlineKeyboardButton(
                     text=("🟢" if tooGoodToGo.users_settings_data[chat_id][
-                        "stock_increased"] else "🔴") + " stock increased",
+                        "stock_increased"] else "🔴") + " Stock increased",
                     callback_data="stock_increased"
                 )
             ],
             [
                 types.InlineKeyboardButton(
-                    text="✅ activate all ✅",
+                    text="✅ Activate all ✅",
                     callback_data="activate_all"
                 )
             ],
 
             [
                 types.InlineKeyboardButton(
-                    text="❌ disable all ❌",
+                    text="❌ Disable all ❌",
                     callback_data="disable_all"
                 )
             ]
@@ -121,6 +129,7 @@ def inline_keyboard_markup(chat_id):
 @bot.message_handler(commands=['settings'])
 async def send_settings(message):
     chat_id = str(message.chat.id)
+    log_command(chat_id, 'settings')
     credentials = tooGoodToGo.find_credentials_by_telegramUserID(chat_id)
     if credentials is None:
         await bot.send_message(chat_id=chat_id,
@@ -191,5 +200,6 @@ async def back_callback(call: types.CallbackQuery):
     await bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                         reply_markup=inline_keyboard_markup(chat_id))
 
+print('TooGoodToGo bot started')
 
 asyncio.run(bot.polling())

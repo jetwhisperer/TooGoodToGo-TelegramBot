@@ -5,6 +5,8 @@ from pathlib import Path
 from _thread import start_new_thread
 from datetime import datetime, timezone
 
+import tgtg
+
 from tgtg import TgtgClient
 from telebot import TeleBot, types
 
@@ -83,9 +85,21 @@ class TooGoodToGo:
     # Get the credentials
     def new_user(self, telegram_user_id, email):
         client = TgtgClient(email=email)
-        credentials = client.get_credentials()
-        self.add_user(telegram_user_id, credentials)
-        self.send_message(telegram_user_id, "✅ You are now logged in!")
+
+        tgtg.MAX_POLLING_TRIES = 60 # 5 minutes (MAX_POLLING_TRIES * 5 seconds of POLLING_WAIT_TIME) / 60
+
+        try:
+            credentials = client.get_credentials()
+            self.add_user(telegram_user_id, credentials)
+            self.send_message(telegram_user_id, "✅ You are now logged in!")
+        except tgtg.exceptions.TgtgPollingError as e:
+            if 'Max retries' in str(e):
+                self.send_message(telegram_user_id, "⏱ *Time expired. Please log in again.*")
+            else:
+                raise e
+        except Exception as err:
+            print(f"Unexpected {err=}, {type(err)=}")
+            self.send_message(telegram_user_id, "❌ _An error happened while logging in. Please try again._")
 
     # Looks if the user is already logged in
     def find_credentials_by_telegramUserID(self, user_id):
@@ -131,7 +145,9 @@ class TooGoodToGo:
                             timezone.utc).strftime("%a %d.%m at %H:%M")))
                 self.send_message_with_link(user_id, text, item_id)
                 available_items.append(item)
-        if len(available_items) == 0:
+        if not favourite_items:
+            self.send_message(user_id, "You do not have any favorites to track yet")
+        elif not available_items:
             self.send_message(user_id, "Currently all your favorites are sold out 😕")
 
     # Loop through all users and see if the number has changed
@@ -146,7 +162,7 @@ class TooGoodToGo:
                     for item in available_items:
                         status = "null"
                         item_id = item['item']['item_id']
-                        if item_id in self.available_items_favorites.keys() and not item_id in temp_available_items.keys():
+                        if item_id in self.available_items_favorites and not item_id in temp_available_items:
                             old_items_available = int(self.available_items_favorites[item_id]['items_available'])
                             new_items_available = int(item['items_available'])
                             if new_items_available == 0 and old_items_available > 0:  # Sold out (x -> 0)
@@ -182,7 +198,7 @@ class TooGoodToGo:
                                                           '%Y-%m-%dT%H:%M:%SZ').astimezone(
                                             timezone.utc).strftime("%a %d.%m at %H:%M")))
                             text += "\n" + saved_status
-                            print(saved_status + " Telegram USER_ID: " + key + "\n" + text)
+                            print(f'{saved_status} [{key}]\n{text}')
                             self.send_message_with_link(key, text, item_id)
                 self.save_available_items_favorites_to_txt()
                 time.sleep(60)
