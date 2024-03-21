@@ -1,0 +1,5 @@
+# Config token
+config.ini
+
+# Python-related
+__pycache__/

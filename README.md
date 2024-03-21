@@ -19,17 +19,23 @@ _🌐 You can find more information about Too Good To Go_ [here](https://www.too
 *🌍 LET'S FIGHT food waste TOGETHER 🌎*
 
 ## Getting Started
-Clone the project to your local PC and replace `<YOUR-TOKEN>` in `config.ini` with your own bot access token that you obtained from Telegram. You can create a bot and obtain a token by following the steps outlined [here](https://core.telegram.org/bots/tutorial#getting-ready).
+1. Clone this project to your local PC.
+   
+2. Copy `config.template.ini` to `config.ini`.
+   
+   `cp config.template.ini config.ini`
+
+3. Replace `<YOUR-TOKEN>` in `config.ini` with your own bot access token that you obtained from Telegram. You can create a bot and obtain a token by following the steps outlined [here](https://core.telegram.org/bots/tutorial#getting-ready).
 
 ### Requires
 Python version: 3.8+
 
 ### Use it
-Install all libraries that are needed 
+Install all libraries that are needed:
    ```
    pip install -r requirements.txt
    ```
-Start the Python script
+Start the Python script:
    ```
    python3 Telegram.py
    ```
