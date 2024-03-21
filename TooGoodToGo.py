@@ -154,53 +154,54 @@ class TooGoodToGo:
     def get_available_items_per_user(self):
         while True:
             try:
-                temp_available_items = {}
-                for key in self.users_login_data.keys():
-                    self.connect(key)
-                    time.sleep(1)
-                    available_items = self.get_favourite_items()
-                    for item in available_items:
-                        status = "null"
-                        item_id = item['item']['item_id']
-                        if item_id in self.available_items_favorites and not item_id in temp_available_items:
-                            old_items_available = int(self.available_items_favorites[item_id]['items_available'])
-                            new_items_available = int(item['items_available'])
-                            if new_items_available == 0 and old_items_available > 0:  # Sold out (x -> 0)
-                                status = "sold_out"
-                            elif old_items_available == 0 and new_items_available > 0:  # New Bag available (0 -> x)
-                                status = "new_stock"
-                            elif old_items_available > new_items_available:  # Reduced stock available (x -> x-1)
-                                status = "stock_reduced"
-                            elif old_items_available < new_items_available:  # Increased stock available (x -> x-1)
-                                status = "stock_increased"
-                            if not status == "null":
-                                temp_available_items[item_id] = status
-                        self.available_items_favorites[item_id] = item
-                        if item_id in temp_available_items and \
-                                self.users_settings_data[key][temp_available_items[item_id]] == 1:
-                            saved_status = temp_available_items[item_id]
-                            store_name = "🍽 " + str(item['store']['store_name'])
-                            store_address_line = "🧭 " + str(item['store']['store_location']['address']['address_line'])
-                            store_price = "💰 " + str(int(item['item']["price_including_taxes"]["minor_units"]) / 100)
-                            store_items_available = "🥡 " + str(item['items_available'])
-                            if saved_status == "sold_out":
-                                text = store_name \
-                                       + "\n" + store_address_line \
-                                       + "\n" + store_price \
-                                       + "\n" + store_items_available
-                            else:
-                                text = "{0}\n{1}\n{2}\n{3}\n⏰ {4} - {5}".format(store_name, store_address_line,
-                                                                                store_price, store_items_available, str(
-                                        datetime.strptime(item['pickup_interval']['start'],
-                                                          "%Y-%m-%dT%H:%M:%SZ").astimezone(
-                                            timezone.utc).strftime("%a %d.%m at %H:%M")), str(
-                                        datetime.strptime(item['pickup_interval']['end'],
-                                                          '%Y-%m-%dT%H:%M:%SZ').astimezone(
-                                            timezone.utc).strftime("%a %d.%m at %H:%M")))
-                            text += "\n" + saved_status
-                            print(f'{saved_status} [{key}]\n{text}')
-                            self.send_message_with_link(key, text, item_id)
-                self.save_available_items_favorites_to_txt()
+                if any(setting == 1 for user_settings in self.users_settings_data.values() for setting in user_settings.values()):
+                    temp_available_items = {}
+                    for key in self.users_login_data.keys():
+                        self.connect(key)
+                        time.sleep(1)
+                        available_items = self.get_favourite_items()
+                        for item in available_items:
+                            status = "null"
+                            item_id = item['item']['item_id']
+                            if item_id in self.available_items_favorites and not item_id in temp_available_items:
+                                old_items_available = int(self.available_items_favorites[item_id]['items_available'])
+                                new_items_available = int(item['items_available'])
+                                if new_items_available == 0 and old_items_available > 0:  # Sold out (x -> 0)
+                                    status = "sold_out"
+                                elif old_items_available == 0 and new_items_available > 0:  # New Bag available (0 -> x)
+                                    status = "new_stock"
+                                elif old_items_available > new_items_available:  # Reduced stock available (x -> x-1)
+                                    status = "stock_reduced"
+                                elif old_items_available < new_items_available:  # Increased stock available (x -> x-1)
+                                    status = "stock_increased"
+                                if not status == "null":
+                                    temp_available_items[item_id] = status
+                            self.available_items_favorites[item_id] = item
+                            if item_id in temp_available_items and \
+                                    self.users_settings_data[key][temp_available_items[item_id]] == 1:
+                                saved_status = temp_available_items[item_id]
+                                store_name = "🍽 " + str(item['store']['store_name'])
+                                store_address_line = "🧭 " + str(item['store']['store_location']['address']['address_line'])
+                                store_price = "💰 " + str(int(item['item']["price_including_taxes"]["minor_units"]) / 100)
+                                store_items_available = "🥡 " + str(item['items_available'])
+                                if saved_status == "sold_out":
+                                    text = store_name \
+                                        + "\n" + store_address_line \
+                                        + "\n" + store_price \
+                                        + "\n" + store_items_available
+                                else:
+                                    text = "{0}\n{1}\n{2}\n{3}\n⏰ {4} - {5}".format(store_name, store_address_line,
+                                                                                    store_price, store_items_available, str(
+                                            datetime.strptime(item['pickup_interval']['start'],
+                                                            "%Y-%m-%dT%H:%M:%SZ").astimezone(
+                                                timezone.utc).strftime("%a %d.%m at %H:%M")), str(
+                                            datetime.strptime(item['pickup_interval']['end'],
+                                                            '%Y-%m-%dT%H:%M:%SZ').astimezone(
+                                                timezone.utc).strftime("%a %d.%m at %H:%M")))
+                                text += "\n" + saved_status
+                                print(f'{saved_status} [{key}]\n{text}')
+                                self.send_message_with_link(key, text, item_id)
+                    self.save_available_items_favorites_to_txt()
                 time.sleep(60)
             except Exception as err:
                 print(f"Unexpected {err=}, {type(err)=}")
