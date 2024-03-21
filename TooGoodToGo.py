@@ -1,11 +1,12 @@
 import json
-from _thread import start_new_thread
 import time
+
+from pathlib import Path
+from _thread import start_new_thread
 from datetime import datetime, timezone
 
-from telebot import TeleBot, types
 from tgtg import TgtgClient
-
+from telebot import TeleBot, types
 
 class TooGoodToGo:
     users_login_data = {}
@@ -40,35 +41,34 @@ class TooGoodToGo:
                         url="https://share.toogoodtogo.com/item/" + item_id
                     )
                 ],
-            ]
+            ])
         )
-                              )
 
     def read_users_login_data_from_txt(self):
-        with open('users_login_data.txt', 'r') as file:
+        with open(data_file('users_login_data'), 'r') as file:
             data = file.read()
             self.users_login_data = json.loads(data)
 
     def save_users_login_data_to_txt(self):
-        with open('users_login_data.txt', 'w') as file:
+        with open(data_file('users_login_data'), 'w') as file:
             file.write(json.dumps(self.users_login_data))
 
     def read_users_settings_data_from_txt(self):
-        with open('users_settings_data.txt', 'r') as file:
+        with open(data_file('users_settings_data'), 'r') as file:
             data = file.read()
             self.users_settings_data = json.loads(data)
 
     def save_users_settings_data_to_txt(self):
-        with open('users_settings_data.txt', 'w') as file:
+        with open(data_file('users_settings_data'), 'w') as file:
             file.write(json.dumps(self.users_settings_data))
 
     def read_available_items_favorites_from_txt(self):
-        with open('available_items_favorites.txt', 'r') as file:
+        with open(data_file('available_items_favorites'), 'r') as file:
             data = file.read()
             self.available_items_favorites = json.loads(data)
 
     def save_available_items_favorites_to_txt(self):
-        with open('available_items_favorites.txt', 'w') as file:
+        with open(data_file('available_items_favorites'), 'w') as file:
             file.write(json.dumps(self.available_items_favorites))
 
     def add_user(self, telegram_user_id, credentials):
@@ -188,3 +188,11 @@ class TooGoodToGo:
                 time.sleep(60)
             except Exception as err:
                 print(f"Unexpected {err=}, {type(err)=}")
+
+def data_file(data_file_name: str, data_folder='data') -> Path:
+    data_path = Path(f'{data_folder}/{data_file_name}.txt')
+    if not data_path.exists():
+        data_path.parent.mkdir(exist_ok=True, parents=True)
+        data_path.write_text('{}')
+        print(f'Created {data_path}')
+    return data_path
