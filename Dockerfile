@@ -6,7 +6,7 @@ WORKDIR /usr/src/TooGoodToGo-TelegramBot
 COPY requirements.txt .
 
 # Install dependencies
-RUN pip install --upgrade pip
+RUN pip install --root-user-action=ignore --upgrade pip
 RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
 # Run bot on container start

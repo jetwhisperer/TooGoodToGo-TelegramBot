@@ -24,8 +24,8 @@ class TooGoodToGo:
         self.read_available_items_favorites_from_txt()
         start_new_thread(self.get_available_items_per_user, ())
         self.bot.set_my_commands([
-            types.BotCommand("/info", "favorite bags that currently available"),
-            types.BotCommand("/login", "log in with your mail"),
+            types.BotCommand("/info", "favorite bags currently available"),
+            types.BotCommand("/login", "log in with your email"),
             types.BotCommand("/settings", "set when you want to be notified"),
             types.BotCommand("/help", "short explanation"),
         ])

@@ -63,9 +63,9 @@ async def send_login(message):
     credentials = tooGoodToGo.find_credentials_by_telegramUserID(chat_id)
     if not credentials is None:
         log_command(chat_id, 'login', 'Logged in')
-        await bot.send_message(chat_id=chat_id, text="👍 You are always logged in!")
+        await bot.send_message(chat_id=chat_id, text="👍 You are logged in!")
         return None
-    email = message.text.replace('/login', '').lstrip()
+    email = message.text.replace('/login', '').strip()
 
     if re.match(r"[^@]+@[^@]+\.[^@]+", email):
         log_command(chat_id, 'login', email)
