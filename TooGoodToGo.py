@@ -199,10 +199,10 @@ class TooGoodToGo:
                             if item_id in temp_available_items and \
                                     self.users_settings_data[user_id][temp_available_items[item_id]] == 1:
                                 saved_status = temp_available_items[item_id]
-                                store_name = "🍽 " + str(item['store']['store_name'])
-                                store_address_line = "🧭 " + str(item['store']['store_location']['address']['address_line'])
-                                store_price = "💰 " + str(int(item['item']['price_including_taxes']['minor_units']) / 100)
-                                store_items_available = "🥡 " + str(item['items_available'])
+                                store_name = f"🍽 {item['store']['store_name']}"
+                                store_address_line = f"🧭 {item['store']['store_location']['address']['address_line']}"
+                                store_price = f"💰 {int(item['item']['price_including_taxes']['minor_units']) / 100}"
+                                store_items_available = f"🥡 {item['items_available']}"
                                 if saved_status == "sold_out":
                                     text = store_name \
                                         + "\n" + store_address_line \
@@ -218,7 +218,7 @@ class TooGoodToGo:
                                                             '%Y-%m-%dT%H:%M:%SZ').astimezone(
                                                 timezone.utc).strftime("%a %d.%m at %H:%M")))
                                 text += "\n" + saved_status
-                                print(f'[{user_id}] {saved_status} 🍽 {store_name} ({item_id}) 🥡 {store_items_available}')
+                                print(f"[{user_id}] {saved_status} 🍽  {item['store']['store_name']} ({item_id}) {store_items_available}")
                                 self.send_message_with_link(user_id, text, item_id)
                     self.save_available_items_favorites_to_txt()
                 time.sleep(self.interval_seconds)
