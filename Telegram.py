@@ -12,10 +12,10 @@ config = configparser.ConfigParser()
 config.read('config.ini')
 token = config['Telegram']['token']
 bot = AsyncTeleBot(token)
-tooGoodToGo = TooGoodToGo(token)
+tooGoodToGo = TooGoodToGo(token, config['Configuration'])
 
 def log_command(chat_id: int, command: str, log: str = ''):
-    print("/", command, (f": {log}" if log else ''), " [", chat_id, "]")
+    print(f"/{command}{f': {log}' if log else ''} [{chat_id}]")
 
 # Handle '/start' and '/help'
 @bot.message_handler(commands=['help', 'start'])

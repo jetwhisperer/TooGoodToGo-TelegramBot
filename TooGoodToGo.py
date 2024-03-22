@@ -17,8 +17,9 @@ class TooGoodToGo:
     connected_clients = {}
     client = TgtgClient
 
-    def __init__(self, bot_token):
+    def __init__(self, bot_token: str, config: dict = {}):
         self.bot = TeleBot(bot_token)
+        self.__set_config(config)
         self.read_users_login_data_from_txt()
         self.read_users_settings_data_from_txt()
         self.read_available_items_favorites_from_txt()
@@ -29,6 +30,25 @@ class TooGoodToGo:
             types.BotCommand("/settings", "set when you want to be notified"),
             types.BotCommand("/help", "short explanation"),
         ])
+    
+    def __set_config(self, config: dict):
+        self.interval_seconds = int(config.get('interval_seconds', 60))
+        
+        if self.interval_seconds < 5:
+            self.interval_seconds = 5
+            print("WARNING: interval_seconds set to 5 (minimum)")
+        else:
+            print('interval_seconds', self.interval_seconds)
+        
+        self.login_timeout_minutes = int(config.get('login_timeout_minutes', 5))
+
+        if self.login_timeout_minutes < 2:
+            self.login_timeout_minutes = 2
+            print("WARNING: login_timeout_minutes set to 2 (minimum)")
+        else:
+            print('login_timeout_minutes', self.login_timeout_minutes)
+        
+        tgtg.MAX_POLLING_TRIES = (self.login_timeout_minutes * 60) // tgtg.POLLING_WAIT_TIME
 
     def send_message(self, telegram_user_id, message):
         self.bot.send_message(telegram_user_id, text=message)
@@ -85,8 +105,6 @@ class TooGoodToGo:
     # Get the credentials
     def new_user(self, telegram_user_id, email):
         client = TgtgClient(email=email)
-
-        tgtg.MAX_POLLING_TRIES = 60 # 5 minutes (MAX_POLLING_TRIES * 5 seconds of POLLING_WAIT_TIME) / 60
 
         try:
             credentials = client.get_credentials()
@@ -154,14 +172,15 @@ class TooGoodToGo:
     def get_available_items_per_user(self):
         while True:
             try:
+                # if any user has some alert enabled
                 if any(setting == 1 for user_settings in self.users_settings_data.values() for setting in user_settings.values()):
                     temp_available_items = {}
-                    for key in self.users_login_data.keys():
-                        self.connect(key)
+                    for user_id in self.users_login_data.keys():
+                        self.connect(user_id)
                         time.sleep(1)
                         available_items = self.get_favourite_items()
                         for item in available_items:
-                            status = "null"
+                            status = None
                             item_id = item['item']['item_id']
                             if item_id in self.available_items_favorites and not item_id in temp_available_items:
                                 old_items_available = int(self.available_items_favorites[item_id]['items_available'])
@@ -170,19 +189,19 @@ class TooGoodToGo:
                                     status = "sold_out"
                                 elif old_items_available == 0 and new_items_available > 0:  # New Bag available (0 -> x)
                                     status = "new_stock"
-                                elif old_items_available > new_items_available:  # Reduced stock available (x -> x-1)
+                                elif new_items_available < old_items_available:  # Reduced stock available (x -> x-1)
                                     status = "stock_reduced"
-                                elif old_items_available < new_items_available:  # Increased stock available (x -> x-1)
+                                elif new_items_available > old_items_available:  # Increased stock available (x -> x+1)
                                     status = "stock_increased"
-                                if not status == "null":
+                                if status is not None:
                                     temp_available_items[item_id] = status
                             self.available_items_favorites[item_id] = item
                             if item_id in temp_available_items and \
-                                    self.users_settings_data[key][temp_available_items[item_id]] == 1:
+                                    self.users_settings_data[user_id][temp_available_items[item_id]] == 1:
                                 saved_status = temp_available_items[item_id]
                                 store_name = "🍽 " + str(item['store']['store_name'])
                                 store_address_line = "🧭 " + str(item['store']['store_location']['address']['address_line'])
-                                store_price = "💰 " + str(int(item['item']["price_including_taxes"]["minor_units"]) / 100)
+                                store_price = "💰 " + str(int(item['item']['price_including_taxes']['minor_units']) / 100)
                                 store_items_available = "🥡 " + str(item['items_available'])
                                 if saved_status == "sold_out":
                                     text = store_name \
@@ -199,10 +218,10 @@ class TooGoodToGo:
                                                             '%Y-%m-%dT%H:%M:%SZ').astimezone(
                                                 timezone.utc).strftime("%a %d.%m at %H:%M")))
                                 text += "\n" + saved_status
-                                print(f'{saved_status} [{key}]\n{text}')
-                                self.send_message_with_link(key, text, item_id)
+                                print(f'[{user_id}] {saved_status} 🍽 {store_name} ({item_id}) 🥡 {store_items_available}')
+                                self.send_message_with_link(user_id, text, item_id)
                     self.save_available_items_favorites_to_txt()
-                time.sleep(60)
+                time.sleep(self.interval_seconds)
             except Exception as err:
                 print(f"Unexpected {err=}, {type(err)=}")
 
