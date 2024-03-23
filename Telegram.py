@@ -15,7 +15,7 @@ bot = AsyncTeleBot(token)
 tooGoodToGo = TooGoodToGo(token, config['Configuration'])
 
 def log_command(chat_id: int, command: str, log: str = ''):
-    print(f"/{command}{f': {log}' if log else ''} [{chat_id}]")
+    print(f"[{chat_id}] /{command}{f': {log}' if log else ''}")
 
 # Handle '/start' and '/help'
 @bot.message_handler(commands=['help', 'start'])
@@ -61,7 +61,7 @@ async def send_info(message):
 async def send_login(message):
     chat_id = str(message.chat.id)
     credentials = tooGoodToGo.find_credentials_by_telegramUserID(chat_id)
-    if not credentials is None:
+    if credentials:
         log_command(chat_id, 'login', 'Logged in')
         await bot.send_message(chat_id=chat_id, text="👍 You are logged in!")
         return None
@@ -74,7 +74,8 @@ async def send_login(message):
                                                      "\n_Opening email on mobile won't work if you have installed TooGoodToGo app._\n"
                                                      "\n*You must open the link in your PC browser.*"
                                                      "\n_You do not need to enter a password._", parse_mode="markdown")
-        start_new_thread(tooGoodToGo.new_user, (chat_id, email))
+        telegram_username = message.from_user.username
+        start_new_thread(tooGoodToGo.new_user, (chat_id, telegram_username, email))
     else:
         log_command(chat_id, 'login', f'{email} (Invalid)')
         await bot.send_message(chat_id=chat_id,
@@ -90,36 +91,35 @@ def inline_keyboard_markup(chat_id):
         keyboard=[
             [
                 types.InlineKeyboardButton(
-                    text=("🟢" if tooGoodToGo.users_settings_data[chat_id]["sold_out"] else "🔴") + " Sold out",
-                    callback_data="sold_out"
+                    text=('🟢' if tooGoodToGo.users_settings_data[chat_id]['sold_out'] else '🔴') + ' ' + tooGoodToGo.format_status('sold_out'),
+                    callback_data='sold_out'
                 ),
                 types.InlineKeyboardButton(
-                    text=("🟢" if tooGoodToGo.users_settings_data[chat_id]["new_stock"] else "🔴") + " New stock",
-                    callback_data="new_stock"
+                    text=('🟢' if tooGoodToGo.users_settings_data[chat_id]['new_stock'] else '🔴') + ' ' + tooGoodToGo.format_status('new_stock'),
+                    callback_data='new_stock'
                 )
             ],
             [
                 types.InlineKeyboardButton(
-                    text=("🟢" if tooGoodToGo.users_settings_data[chat_id]["stock_reduced"] else "🔴") + " Stock reduced",
-                    callback_data="stock_reduced"
+                    text=("🟢" if tooGoodToGo.users_settings_data[chat_id]['stock_reduced'] else '🔴') + ' ' + tooGoodToGo.format_status('stock_reduced'),
+                    callback_data='stock_reduced'
                 ),
                 types.InlineKeyboardButton(
-                    text=("🟢" if tooGoodToGo.users_settings_data[chat_id][
-                        "stock_increased"] else "🔴") + " Stock increased",
-                    callback_data="stock_increased"
+                    text=("🟢" if tooGoodToGo.users_settings_data[chat_id]['stock_increased'] else '🔴') + ' ' + tooGoodToGo.format_status('new_stock'),
+                    callback_data='stock_increased'
                 )
             ],
             [
                 types.InlineKeyboardButton(
-                    text="✅ Activate all ✅",
-                    callback_data="activate_all"
+                    text='✅ Activate all ✅',
+                    callback_data='activate_all'
                 )
             ],
 
             [
                 types.InlineKeyboardButton(
-                    text="❌ Disable all ❌",
-                    callback_data="disable_all"
+                    text='❌ Disable all ❌',
+                    callback_data='disable_all'
                 )
             ]
         ])

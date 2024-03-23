@@ -12,6 +12,14 @@ from tgtg import TgtgClient
 from telebot import TeleBot, types
 
 class TooGoodToGo:
+
+    ITEM_STATUS = {
+        'sold_out': 'Sold out',
+        'new_stock': 'New stock',
+        'stock_reduced': 'Stock reduced',
+        'stock_increased': 'Stock increased',
+    }
+
     users_login_data = {}
     users_settings_data = {}
     available_items_favorites = {}
@@ -111,11 +119,13 @@ class TooGoodToGo:
         self.save_users_settings_data_to_txt()
 
     # Get the credentials
-    def new_user(self, telegram_user_id, email):
+    def new_user(self, telegram_user_id, telegram_username, email):
         client = TgtgClient(email=email)
 
         try:
             credentials = client.get_credentials()
+            credentials['email'] = email
+            credentials['telegram_username'] = telegram_username
             self.add_user(telegram_user_id, credentials)
             self.send_message(telegram_user_id, "✅ You are now logged in!")
         except tgtg.exceptions.TgtgPollingError as e:
@@ -125,7 +135,7 @@ class TooGoodToGo:
                 raise e
         except Exception as err:
             print(f"Unexpected {err=}, {type(err)=}")
-            self.send_message(telegram_user_id, "❌ _An error happened while logging in. Please try again._")
+            self.send_message(telegram_user_id, "❌ An error happened while logging in. Please try again.")
 
     # Look if the user is already logged in
     def find_credentials_by_telegramUserID(self, user_id):
@@ -169,11 +179,12 @@ class TooGoodToGo:
         store_name = item['store']['store_name'].strip()
         store_name_text = f"🍽 {store_name}"
         store_address_line = f"🧭 {item['store']['store_location']['address']['address_line']}"
-        store_price = f"💰 {int(item['item']['price_including_taxes']['minor_units']) / 100}"
         store_items_available = item['items_available']
         store_items_available_text = f"🥡 {item['items_available']}"
+        item_price_code = self.__format_price_code(item['item']['item_price']['code'])
+        item_price = f"💰 {int(item['item']['price_including_taxes']['minor_units']) / 100} {item_price_code}"
 
-        item_text = f"{store_name_text}\n{store_address_line}\n{store_price}\n{store_items_available_text}"
+        item_text = f"{store_name_text}\n{store_address_line}\n{item_price}\n{store_items_available_text}"
 
         if store_items_available > 0:
             store_pickup_start = self.__format_datetime(item['pickup_interval']['start'])
@@ -182,12 +193,23 @@ class TooGoodToGo:
             item_text += '\n' + store_pickup_text
         
         if status:
+            status = self.format_status(status)
             item_text += '\n' + status
             if user_id:
                 item_id = item['item']['item_id']
                 print(f"[{user_id}] {status} {store_items_available_text} 🍽  {store_name} ({item_id})")
         
         return item_text
+    
+    def __format_price_code(self, price_code: str) -> str:
+        if price_code == 'EUR':
+            return '€'
+        if price_code == 'USD':
+            return '$'
+        return price_code
+
+    def format_status(self, status: str) -> str:
+        return TooGoodToGo.ITEM_STATUS[status]
 
     def get_available_items_per_user(self):
         """Loop through all users and see if the number of their favorite bags has changed"""
@@ -264,8 +286,8 @@ class TooGoodToGo:
     def __format_datetime(self, datetime_str: str) -> str:
         return str(datetime.strptime(datetime_str, '%Y-%m-%dT%H:%M:%SZ').astimezone(self.timezone).strftime("%a %d.%m at %H:%M"))
 
-def data_file(data_file_name: str, data_folder='data') -> Path:
-    data_path = Path(f'{data_folder}/{data_file_name}.txt')
+def data_file(data_file_name: str, data_folder='data', extension='json') -> Path:
+    data_path = Path(f'{data_folder}/{data_file_name}.{extension}')
     if not data_path.exists():
         data_path.parent.mkdir(exist_ok=True, parents=True)
         data_path.write_text('{}')
