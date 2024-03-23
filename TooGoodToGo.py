@@ -60,11 +60,10 @@ class TooGoodToGo:
 
         # min 0 max 23 default 23
         self.low_hours_start = max(0, min(23, int(config.get('low_hours_start', 23))))
-        print('low_hours_start', self.low_hours_start)
-
+        
         # min 0 max 23 default 6
         self.low_hours_end = max(0, min(23, int(config.get('low_hours_end', 6))))
-        print('low_hours_end', self.low_hours_end)
+        print('Low hours', self.low_hours_start, '-', self.low_hours_end)
 
     def send_message(self, telegram_user_id, message):
         self.bot.send_message(telegram_user_id, text=message)
