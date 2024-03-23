@@ -105,7 +105,7 @@ def inline_keyboard_markup(chat_id):
                     callback_data='stock_reduced'
                 ),
                 types.InlineKeyboardButton(
-                    text=("🟢" if tooGoodToGo.users_settings_data[chat_id]['stock_increased'] else '🔴') + ' ' + tooGoodToGo.format_status('new_stock'),
+                    text=("🟢" if tooGoodToGo.users_settings_data[chat_id]['stock_increased'] else '🔴') + ' ' + tooGoodToGo.format_status('stock_increased'),
                     callback_data='stock_increased'
                 )
             ],
