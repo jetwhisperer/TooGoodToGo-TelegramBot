@@ -77,11 +77,6 @@ async def send_login(message):
 
     if re.match(r"[^@]+@[^@]+\.[^@]+", email):
         log_command(chat_id, 'login', email)
-        await bot.send_message(chat_id=chat_id, text="📩 Please open your mail account."
-                                                     "\nYou will receive an email with a confirmation link."
-                                                     "\n_Opening email on mobile won't work if you have installed TooGoodToGo app._\n"
-                                                     "\n*You must open the link in your PC browser.*"
-                                                     "\n_You do not need to enter a password._", parse_mode="markdown")
         telegram_username = message.from_user.username
         start_new_thread(tooGoodToGo.new_user, (chat_id, telegram_username, email))
     else:

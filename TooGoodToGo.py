@@ -43,7 +43,10 @@ class TooGoodToGo:
     def __set_config(self, config: dict):
         self.timezone = timezone(config.get('timezone', 'UTC'))
         print('timezone', self.timezone)
-        
+
+        self.language = config.get('language', 'en-GB')
+        print('language', self.language)
+
         # min 2 default 5
         self.login_timeout_minutes = max(2, int(config.get('login_timeout_minutes', 5)))
         print('login_timeout_minutes', self.login_timeout_minutes)
@@ -65,8 +68,8 @@ class TooGoodToGo:
         self.low_hours_end = max(0, min(23, int(config.get('low_hours_end', 6))))
         print('Low hours', self.low_hours_start, '-', self.low_hours_end)
 
-    def send_message(self, telegram_user_id, message):
-        self.bot.send_message(telegram_user_id, text=message)
+    def send_message(self, telegram_user_id, message, parse_mode=None):
+        self.bot.send_message(telegram_user_id, text=message, parse_mode=parse_mode)
 
     def send_message_with_link(self, telegram_user_id, message, item_id):
         self.bot.send_message(telegram_user_id, text=message, reply_markup=types.InlineKeyboardMarkup(
@@ -111,15 +114,23 @@ class TooGoodToGo:
     def add_user(self, telegram_user_id, credentials):
         self.users_login_data[telegram_user_id] = credentials
         self.save_users_login_data_to_txt()
-        self.users_settings_data[telegram_user_id] = {'sold_out': 0,
-                                                      'new_stock': 1,
-                                                      'stock_reduced': 0,
-                                                      'stock_increased': 0}
-        self.save_users_settings_data_to_txt()
+
+        if telegram_user_id not in self.users_settings_data:
+            self.users_settings_data[telegram_user_id] = {'sold_out': 0,
+                                                        'new_stock': 1,
+                                                        'stock_reduced': 0,
+                                                        'stock_increased': 0}
+            self.save_users_settings_data_to_txt()
 
     # Get the credentials
     def new_user(self, telegram_user_id, telegram_username, email):
         client = TgtgClient(email=email)
+
+        self.send_message(telegram_user_id, "📩 Please open your mail account."
+                                    "\nYou will receive an email with a confirmation link."
+                                    "\n_Opening email on mobile won't work if you have installed TooGoodToGo app._\n"
+                                    "\n*You must open the link in your PC browser.*"
+                                    "\n_You do not need to enter a password._", parse_mode="markdown")
 
         try:
             credentials = client.get_credentials()
@@ -154,7 +165,8 @@ class TooGoodToGo:
             self.client = TgtgClient(access_token=user_credentials["access_token"],
                                     refresh_token=user_credentials["refresh_token"],
                                     user_id=user_credentials["user_id"],
-                                    cookie=user_credentials["cookie"])
+                                    cookie=user_credentials["cookie"],
+                                    language=self.language)
             self.connected_clients[user_id] = self.client
             time.sleep(2)
         return True
