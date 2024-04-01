@@ -138,11 +138,14 @@ class TooGoodToGo:
             credentials['telegram_username'] = telegram_username
             self.add_user(telegram_user_id, credentials)
             self.send_message(telegram_user_id, "✅ You are now logged in!")
-        except tgtg.exceptions.TgtgPollingError as e:
-            if 'Max retries' in str(e):
+        except tgtg.exceptions.TgtgPollingError as err:
+            if 'Max retries' in str(err):
                 self.send_message(telegram_user_id, "⏱ *Time expired. Please log in again.*")
             else:
-                raise e
+                raise err
+        except tgtg.exceptions.TgtgAPIError as err:
+            self.log_api_error(err)
+            self.send_message(telegram_user_id, "❌ Cannot log in. Please try again later.")
         except Exception as err:
             print(f"Unexpected {err=}, {type(err)=}")
             self.send_message(telegram_user_id, "❌ An error happened while logging in. Please try again.")
