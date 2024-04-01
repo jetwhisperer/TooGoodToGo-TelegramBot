@@ -8,6 +8,8 @@ from telebot.async_telebot import AsyncTeleBot
 
 from TooGoodToGo import TooGoodToGo
 
+import tgtg.exceptions
+
 config = configparser.ConfigParser()
 config.read('config.ini')
 token = config['Telegram']['token']
@@ -60,11 +62,17 @@ async def send_info(message):
 @bot.message_handler(commands=['login'])
 async def send_login(message):
     chat_id = str(message.chat.id)
-    credentials = tooGoodToGo.find_credentials_by_telegramUserID(chat_id)
-    if credentials:
-        log_command(chat_id, 'login', 'Logged in')
-        await bot.send_message(chat_id=chat_id, text="👍 You are logged in!")
+
+    try:
+        if tooGoodToGo.connect(chat_id):
+            log_command(chat_id, 'login', 'Logged in')
+            await bot.send_message(chat_id=chat_id, text="👍 You are logged in!")
+            return None
+    except tgtg.exceptions.TgtgAPIError as err:
+        tooGoodToGo.log_api_error(err)
+        bot.send_message(chat_id, "❌ Cannot log in. Please try again later.")
         return None
+        
     email = message.text.replace('/login', '').strip()
 
     if re.match(r"[^@]+@[^@]+\.[^@]+", email):

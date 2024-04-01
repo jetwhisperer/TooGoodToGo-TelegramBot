@@ -146,13 +146,18 @@ class TooGoodToGo:
             self.client = self.connected_clients[user_id]
         else:
             user_credentials = self.find_credentials_by_telegramUserID(user_id)
+
+            if user_credentials is None:
+                return False
+            
             print(f"Connect {user_id}")
             self.client = TgtgClient(access_token=user_credentials["access_token"],
-                                     refresh_token=user_credentials["refresh_token"],
-                                     user_id=user_credentials["user_id"],
-                                     cookie=user_credentials["cookie"])
+                                    refresh_token=user_credentials["refresh_token"],
+                                    user_id=user_credentials["user_id"],
+                                    cookie=user_credentials["cookie"])
             self.connected_clients[user_id] = self.client
-            time.sleep(3)
+            time.sleep(2)
+        return True
 
     def get_favourite_items(self):
         favourite_items = self.client.get_items()
@@ -160,19 +165,32 @@ class TooGoodToGo:
 
     # /info command
     def send_available_favourite_items_for_one_user(self, user_id):
-        self.connect(user_id)
-        available_items = []
-        favourite_items = self.get_favourite_items()
-        for item in favourite_items:
-            if item['items_available'] > 0:
-                item_id = item['item']['item_id']
-                item_text = self.format_item(item)
-                self.send_message_with_link(user_id, item_text, item_id)
-                available_items.append(item_id)
-        if not favourite_items:
-            self.send_message(user_id, "You do not have any favorites to track yet")
-        elif not available_items:
-            self.send_message(user_id, "Currently all your favorites are sold out 😕")
+        try:
+            self.connect(user_id)
+            available_items = []
+            favourite_items = self.get_favourite_items()
+            for item in favourite_items:
+                if item['items_available'] > 0:
+                    item_id = item['item']['item_id']
+                    item_text = self.format_item(item)
+                    self.send_message_with_link(user_id, item_text, item_id)
+                    available_items.append(item_id)
+            if not favourite_items:
+                self.send_message(user_id, "You do not have any favorites to track yet")
+            elif not available_items:
+                self.send_message(user_id, "Currently all your favorites are sold out 😕")
+        except tgtg.exceptions.TgtgAPIError as err:
+            self.log_api_error(err)
+            self.send_message(user_id, "❌ Cannot retrieve your items. Please try again later.")
+        except Exception as err:
+            print(f"Unexpected {err=}, {type(err)=}")
+            self.send_message(user_id, "❌ An error happened trying to retrieve your items. Please try again.")
+    
+    def log_api_error(self, err):
+        if err.args and 403 == err.args[0]:
+            print(f"Unauthorized {err=}")
+        else:
+            print(f"Unexpected API Error: {err=}")
     
     def format_item(self, item, status = None, user_id = None) -> str:
         store_name = item['store']['store_name'].strip()
@@ -253,12 +271,15 @@ class TooGoodToGo:
                 
                 if changed_items_status or len(self.available_items_favorites) != available_items_before:
                     self.save_available_items_favorites_to_txt()
-                
-                # wait until next check
-                time.sleep(self.get_interval_seconds())
-                
+            
+            except tgtg.exceptions.TgtgAPIError as err:
+                self.log_api_error(err)
+
             except Exception as err:
                 print(f"Unexpected {err=}, {type(err)=}")
+            
+            # wait until next check
+            time.sleep(self.get_interval_seconds())
     
     def get_interval_seconds(self):
         low_hours = False
