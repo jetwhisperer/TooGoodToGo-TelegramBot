@@ -124,7 +124,7 @@ class TooGoodToGo:
 
     # Get the credentials
     def new_user(self, telegram_user_id, telegram_username, email):
-        client = TgtgClient(email=email)
+        client = TgtgClient(email=email, language=self.language)
 
         self.send_message(telegram_user_id, "📩 Please open your mail account."
                                     "\nYou will receive an email with a confirmation link."
