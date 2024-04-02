@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 from _thread import start_new_thread
 from datetime import datetime
-from pytz import timezone
+from pytz import timezone, utc
 
 import tgtg
 
@@ -24,15 +24,18 @@ class TooGoodToGo:
     users_settings_data = {}
     available_items_favorites = {}
     connected_clients = {}
-    client = TgtgClient
 
     def __init__(self, bot_token: str, config: dict = {}):
         self.bot = TeleBot(bot_token)
+
         self.__set_config(config)
+
         self.read_users_login_data_from_txt()
         self.read_users_settings_data_from_txt()
         self.read_available_items_favorites_from_txt()
+
         start_new_thread(self.get_available_items_per_user, ())
+
         self.bot.set_my_commands([
             types.BotCommand("/info", "favorite bags currently available"),
             types.BotCommand("/login", "log in with your email"),
@@ -86,40 +89,43 @@ class TooGoodToGo:
 
     def read_users_login_data_from_txt(self):
         with open(data_file('users_login_data'), 'r') as file:
-            data = file.read()
-            self.users_login_data = json.loads(data)
+            self.users_login_data = json.load(file, cls=DateTimeDecoder)
 
     def save_users_login_data_to_txt(self):
         with open(data_file('users_login_data'), 'w') as file:
-            file.write(json.dumps(self.users_login_data))
+            json.dump(self.users_login_data, file, cls=DateTimeEncoder)
 
     def read_users_settings_data_from_txt(self):
         with open(data_file('users_settings_data'), 'r') as file:
-            data = file.read()
-            self.users_settings_data = json.loads(data)
+            self.users_settings_data = json.load(file)
 
     def save_users_settings_data_to_txt(self):
         with open(data_file('users_settings_data'), 'w') as file:
-            file.write(json.dumps(self.users_settings_data))
+            json.dump(self.users_settings_data, file)
 
     def read_available_items_favorites_from_txt(self):
         with open(data_file('available_items_favorites'), 'r') as file:
-            data = file.read()
-            self.available_items_favorites = json.loads(data)
+            self.available_items_favorites = json.load(file)
 
     def save_available_items_favorites_to_txt(self):
         with open(data_file('available_items_favorites'), 'w') as file:
-            file.write(json.dumps(self.available_items_favorites))
+            json.dump(self.available_items_favorites, file)
 
-    def add_user(self, telegram_user_id, credentials):
+    def add_user(self, login_client, telegram_user_id, telegram_username, credentials):
+        credentials['email'] = login_client.email
+        credentials['telegram_username'] = telegram_username
+        credentials['last_time_token_refreshed'] = login_client.last_time_token_refreshed
+
         self.users_login_data[telegram_user_id] = credentials
         self.save_users_login_data_to_txt()
 
         if telegram_user_id not in self.users_settings_data:
-            self.users_settings_data[telegram_user_id] = {'sold_out': 0,
-                                                        'new_stock': 1,
-                                                        'stock_reduced': 0,
-                                                        'stock_increased': 0}
+            self.users_settings_data[telegram_user_id] = {
+                'sold_out': 0,
+                'new_stock': 1,
+                'stock_reduced': 0,
+                'stock_increased': 0
+            }
             self.save_users_settings_data_to_txt()
 
     # Get the credentials
@@ -133,22 +139,44 @@ class TooGoodToGo:
                                     "\n_You do not need to enter a password._", parse_mode="markdown")
 
         try:
-            credentials = client.get_credentials()
-            credentials['email'] = email
-            credentials['telegram_username'] = telegram_username
-            self.add_user(telegram_user_id, credentials)
+            credentials = client.get_credentials() # login
+            self.add_user(client, telegram_user_id, telegram_username, credentials)
+            self.connect(telegram_user_id)
             self.send_message(telegram_user_id, "✅ You are now logged in!")
         except tgtg.exceptions.TgtgPollingError as err:
             if 'Max retries' in str(err):
-                self.send_message(telegram_user_id, "⏱ *Time expired. Please log in again.*")
+                self.send_message(telegram_user_id, "⏱ *Time expired. Please log in again.*", parse_mode="markdown")
             else:
                 raise err
         except tgtg.exceptions.TgtgAPIError as err:
-            self.log_api_error(err)
+            self.handle_api_error(err, telegram_user_id, client)
             self.send_message(telegram_user_id, "❌ Cannot log in. Please try again later.")
         except Exception as err:
             print(f"Unexpected {err=}, {type(err)=}")
             self.send_message(telegram_user_id, "❌ An error happened while logging in. Please try again.")
+    
+    # Save refreshed tokens and cookies
+    def update_credentials(self, telegram_user_id, refresh=False, client=None):
+        if not client:
+            client = self.get_client(telegram_user_id)
+
+            if not client:
+                return False
+
+        if refresh:
+            client.login() # tokens may need to be refreshed
+        
+        user_credentials = self.find_credentials_by_telegramUserID(telegram_user_id)
+
+        if user_credentials and user_credentials['last_time_token_refreshed'] < client.last_time_token_refreshed:
+            user_credentials['last_time_token_refreshed'] = client.last_time_token_refreshed
+            user_credentials['access_token'] = client.access_token
+            user_credentials['refresh_token'] = client.refresh_token
+            user_credentials['cookie'] = client.cookie
+
+            self.save_users_login_data_to_txt()
+        
+        return True
 
     # Look if the user is already logged in
     def find_credentials_by_telegramUserID(self, user_id):
@@ -156,34 +184,46 @@ class TooGoodToGo:
 
     # Checks if a connection already exists, or if it has to be created initially.
     def connect(self, user_id):
-        if user_id in self.connected_clients:
-            self.client = self.connected_clients[user_id]
-        else:
+        client = self.get_client(user_id)
+
+        if not client:
             user_credentials = self.find_credentials_by_telegramUserID(user_id)
 
-            if user_credentials is None:
-                return False
+            if not user_credentials:
+                return None
             
             print(f"Connect {user_id}")
-            self.client = TgtgClient(access_token=user_credentials["access_token"],
-                                    refresh_token=user_credentials["refresh_token"],
-                                    user_id=user_credentials["user_id"],
-                                    cookie=user_credentials["cookie"],
-                                    language=self.language)
-            self.connected_clients[user_id] = self.client
+            client = TgtgClient(user_id=user_credentials["user_id"],
+                                access_token=user_credentials["access_token"],
+                                refresh_token=user_credentials["refresh_token"],
+                                last_time_token_refreshed=user_credentials["last_time_token_refreshed"],
+                                cookie=user_credentials["cookie"],
+                                language=self.language)
+            self.connected_clients[user_id] = client
             time.sleep(2)
-        return True
 
-    def get_favourite_items(self):
-        favourite_items = self.client.get_items()
+        return client
+    
+    def get_client(self, user_id):
+        return self.connected_clients.get(user_id)
+
+    def get_favourite_items(self, telegram_user_id):
+        client = self.connect(telegram_user_id)
+
+        if not client:
+            return None
+
+        favourite_items = client.get_items(favorites_only=True)
+
+        self.update_credentials(telegram_user_id, client=client)
+
         return favourite_items
 
     # /info command
     def send_available_favourite_items_for_one_user(self, user_id):
         try:
-            self.connect(user_id)
             available_items = []
-            favourite_items = self.get_favourite_items()
+            favourite_items = self.get_favourite_items(user_id)
             for item in favourite_items:
                 if item['items_available'] > 0:
                     item_id = item['item']['item_id']
@@ -195,15 +235,20 @@ class TooGoodToGo:
             elif not available_items:
                 self.send_message(user_id, "Currently all your favorites are sold out 😕")
         except tgtg.exceptions.TgtgAPIError as err:
-            self.log_api_error(err)
-            self.send_message(user_id, "❌ Cannot retrieve your items. Please try again later.")
+            self.handle_api_error(err, user_id)
+            self.send_message(user_id, "❌ Cannot retrieve your favourites. Please try again later.")
         except Exception as err:
             print(f"Unexpected {err=}, {type(err)=}")
-            self.send_message(user_id, "❌ An error happened trying to retrieve your items. Please try again.")
+            self.send_message(user_id, "❌ An error happened trying to retrieve your favourites. Please try again.")
     
-    def log_api_error(self, err):
-        if err.args and 403 == err.args[0]:
+    def handle_api_error(self, err, user_id, client=None):
+        if err.args and err.args[0] == 403:
             print(f"Unauthorized {err=}")
+            
+            if not client:
+                client = self.get_client(user_id)
+            
+            print('Headers', client._headers if client else None)
         else:
             print(f"Unexpected API Error: {err=}")
     
@@ -246,18 +291,16 @@ class TooGoodToGo:
     def get_available_items_per_user(self):
         """Loop through all users and see if the number of their favorite bags has changed"""
         while True:
-            try:
-                changed_items_status = {}
-                available_items_before = len(self.available_items_favorites)
-                
-                for user_id in self.users_login_data:
+            changed_items_status = {}
+            available_items_before = len(self.available_items_favorites)
+            
+            for user_id in self.users_login_data:
+                try:
                     user_settings = self.users_settings_data[user_id]
 
                     # if any alert is enabled for this user
                     if any(setting == 1 for setting in user_settings.values()):
-                        self.connect(user_id)
-                        
-                        favourite_items = self.get_favourite_items()
+                        favourite_items = self.get_favourite_items(user_id)
 
                         for item in favourite_items:
                             item_id = item['item']['item_id']
@@ -283,13 +326,12 @@ class TooGoodToGo:
                                     self.send_message_with_link(user_id, item_text, item_id)
                             
                             self.available_items_favorites[item_id] = item
-                
+                except tgtg.exceptions.TgtgAPIError as err:
+                    self.handle_api_error(err, user_id)
+            
+            try:
                 if changed_items_status or len(self.available_items_favorites) != available_items_before:
                     self.save_available_items_favorites_to_txt()
-            
-            except tgtg.exceptions.TgtgAPIError as err:
-                self.log_api_error(err)
-
             except Exception as err:
                 print(f"Unexpected {err=}, {type(err)=}")
             
@@ -319,7 +361,9 @@ class TooGoodToGo:
         return self.interval_seconds
     
     def __format_datetime(self, datetime_str: str) -> str:
-        return str(datetime.strptime(datetime_str, '%Y-%m-%dT%H:%M:%SZ').astimezone(self.timezone).strftime("%a %d.%m at %H:%M"))
+        return datetime.strptime(datetime_str, '%Y-%m-%dT%H:%M:%SZ') \
+                    .astimezone(self.timezone) \
+                    .strftime("%a %d.%m at %H:%M")
 
 def data_file(data_file_name: str, data_folder='data', extension='json') -> Path:
     data_path = Path(f'{data_folder}/{data_file_name}.{extension}')
@@ -328,3 +372,19 @@ def data_file(data_file_name: str, data_folder='data', extension='json') -> Path
         data_path.write_text('{}')
         print(f'Created {data_path}')
     return data_path
+
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.astimezone(utc).isoformat()
+        return super().default(obj)
+
+class DateTimeDecoder(json.JSONDecoder):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, object_hook=self.object_hook, **kwargs)
+
+    def object_hook(self, obj):
+        for key, value in obj.items():
+            if key == 'last_time_token_refreshed':
+                obj[key] = datetime.fromisoformat(value)
+        return obj

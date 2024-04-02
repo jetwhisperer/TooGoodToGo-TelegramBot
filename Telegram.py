@@ -64,12 +64,12 @@ async def send_login(message):
     chat_id = str(message.chat.id)
 
     try:
-        if tooGoodToGo.connect(chat_id):
+        if tooGoodToGo.update_credentials(chat_id, refresh=True):
             log_command(chat_id, 'login', 'Logged in')
             await bot.send_message(chat_id=chat_id, text="👍 You are logged in!")
             return None
     except tgtg.exceptions.TgtgAPIError as err:
-        tooGoodToGo.log_api_error(err)
+        tooGoodToGo.handle_api_error(err, chat_id)
         bot.send_message(chat_id, "❌ Cannot log in. Please try again later.")
         return None
         
