@@ -386,5 +386,8 @@ class DateTimeDecoder(json.JSONDecoder):
     def object_hook(self, obj):
         for key, value in obj.items():
             if key == 'last_time_token_refreshed':
-                obj[key] = datetime.fromisoformat(value)
+                obj[key] = datetime.fromisoformat(value) \
+                    .astimezone().replace(tzinfo=None)
+                    # tgtg model login uses local timezone naive datetime.now() to compare refresh token time
+                    # tgtg/__init__.py", line 121, in _refresh_token
         return obj
