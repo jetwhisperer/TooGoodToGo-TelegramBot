@@ -248,7 +248,7 @@ class TooGoodToGo:
             status, message = err.args
 
             if status in [401, 403]:
-                print(f"Unauthorized [{status}]: {message}")
+                print(f"API Unauthorized [{status}]: {message}")
                 
                 if not client:
                     client = self.get_client(user_id)
@@ -258,13 +258,15 @@ class TooGoodToGo:
                 if status == 401:
                     user_credentials = self.find_credentials_by_telegramUserID(user_id)
 
-                    del self.connected_clients[user_id]
-                    del self.users_login_data[user_id]
-                    self.save_users_login_data_to_txt()
-                    
-                    print(f"Hello, {user_credentials['telegram_username']}, your session expired ({user_id}), please /login again to continue receiving notifications.")
+                    if user_credentials:
+                        del self.connected_clients[user_id]
+                        del self.users_login_data[user_id]
+                        self.save_users_login_data_to_txt()
+                        print("Expired user login data:", user_id)
+                        
+                        self.send_message(user_id, f"Hello, {user_credentials['telegram_username']}, your session expired, please /login again to continue receiving notifications.")
             else:
-                print(f"API Error: {err=}")
+                print(f"API Error [{status}]: {message}")
         else:
             print(f"Unexpected API Error: {err=}")
     
