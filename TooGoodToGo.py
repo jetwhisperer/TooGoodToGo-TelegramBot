@@ -175,6 +175,8 @@ class TooGoodToGo:
             user_credentials['cookie'] = client.cookie
 
             self.save_users_login_data_to_txt()
+
+            print(f"{telegram_user_id} token refreshed")
         
         return True
 
@@ -235,20 +237,34 @@ class TooGoodToGo:
             elif not available_items:
                 self.send_message(user_id, "Currently all your favorites are sold out 😕")
         except tgtg.exceptions.TgtgAPIError as err:
-            self.handle_api_error(err, user_id)
             self.send_message(user_id, "❌ Cannot retrieve your favourites. Please try again later.")
+            self.handle_api_error(err, user_id)
         except Exception as err:
             print(f"Unexpected {err=}, {type(err)=}")
             self.send_message(user_id, "❌ An error happened trying to retrieve your favourites. Please try again.")
     
     def handle_api_error(self, err, user_id, client=None):
-        if err.args and err.args[0] == 403:
-            print(f"Unauthorized {err=}")
-            
-            if not client:
-                client = self.get_client(user_id)
-            
-            print('Headers', client._headers if client else None)
+        if len(err.args) == 2:
+            status, message = err.args
+
+            if status in [401, 403]:
+                print(f"Unauthorized [{status}]: {message}")
+                
+                if not client:
+                    client = self.get_client(user_id)
+                
+                print('Headers', client._headers if client else None)
+
+                if status == 401:
+                    user_credentials = self.find_credentials_by_telegramUserID(user_id)
+
+                    del self.connected_clients[user_id]
+                    del self.users_login_data[user_id]
+                    self.save_users_login_data_to_txt()
+                    
+                    print(f"Hello, {user_credentials['telegram_username']}, your session expired ({user_id}), please /login again to continue receiving notifications.")
+            else:
+                print(f"API Error: {err=}")
         else:
             print(f"Unexpected API Error: {err=}")
     
