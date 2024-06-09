@@ -205,4 +205,4 @@ async def back_callback(call: types.CallbackQuery):
 
 print('TooGoodToGo bot started')
 
-asyncio.run(bot.infinity_polling())
+asyncio.run(bot.polling())
