@@ -10,7 +10,7 @@ from TooGoodToGo import TooGoodToGo
 
 import tgtg.exceptions
 
-config = configparser.ConfigParser()
+config = configparser.ConfigParser(interpolation=None)
 config.read('config.ini')
 token = config['Telegram']['token']
 bot = AsyncTeleBot(token)

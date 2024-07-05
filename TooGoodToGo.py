@@ -49,6 +49,9 @@ class TooGoodToGo:
 
         self.language = config.get('language', 'en-GB')
         print('language', self.language)
+        
+        self.date_format = config.get('date_format', '%a %d.%m at %H:%M')
+        print('date_format', self.date_format)
 
         # min 2 default 5
         self.login_timeout_minutes = max(2, int(config.get('login_timeout_minutes', 5)))
@@ -379,9 +382,11 @@ class TooGoodToGo:
         return self.interval_seconds
     
     def __format_datetime(self, datetime_str: str) -> str:
-        return datetime.strptime(datetime_str, '%Y-%m-%dT%H:%M:%SZ') \
-                    .astimezone(self.timezone) \
-                    .strftime("%a %d.%m at %H:%M")
+        return (datetime.strptime(datetime_str, '%Y-%m-%dT%H:%M:%SZ')
+                .replace(tzinfo=utc)
+                .astimezone(self.timezone)
+                .strftime(self.date_format))
+
 
 def data_file(data_file_name: str, data_folder='data', extension='json') -> Path:
     data_path = Path(f'{data_folder}/{data_file_name}.{extension}')
