@@ -5,6 +5,7 @@ from pathlib import Path
 from _thread import start_new_thread
 from datetime import datetime
 from pytz import timezone, utc
+from babel.numbers import format_currency
 
 import tgtg
 
@@ -272,6 +273,43 @@ class TooGoodToGo:
                 print(f"API Error [{status}]: {message}")
         else:
             print(f"Unexpected API Error: {err=}")
+
+    def __get_tax_percentage(self, item):
+        tax_map_list = item['item']['sales_taxes']
+        tax_percentage = 0
+        for tax_map in tax_map_list:
+            tax_percentage += tax_map['tax_percentage']
+
+        return tax_percentage / 100
+
+    def __get_price(self, item):
+        item_price_code = item['item']['item_price']['code']
+
+        if item['item']['taxation_policy'] == 'PRICE_DOES_NOT_INCLUDE_TAXES':
+            tax_percentage = self.__get_tax_percentage(item)
+            item_price = self.__get_currency(item['item']['price_excluding_taxes']) * (1 + tax_percentage)
+        else:
+            item_price = self.__get_currency(item['item']['price_including_taxes'])
+
+        item_price_string = format_currency(item_price, item_price_code)
+        return item_price_string
+
+    def __get_value(self, item):
+        item_price_code = item['item']['item_price']['code']
+
+        if item['item']['taxation_policy'] == 'PRICE_DOES_NOT_INCLUDE_TAXES':
+            tax_percentage = self.__get_tax_percentage(item)
+            item_price = self.__get_currency(item['item']['value_excluding_taxes']) * (1 + tax_percentage)
+        else:
+            item_price = self.__get_currency(item['item']['value_including_taxes'])
+
+        item_price_string = format_currency(item_price, item_price_code)
+        return item_price_string
+
+    def __get_currency(self, price_map):
+        currency_decimals = price_map['decimals']
+        currency_minor_units = int(price_map['minor_units'])
+        return currency_minor_units / (10 ** currency_decimals)
     
     def format_item(self, item, status = None, user_id = None) -> str:
         store_name = item['store']['store_name'].strip()
@@ -279,10 +317,9 @@ class TooGoodToGo:
         store_address_line = f"🧭 {item['store']['store_location']['address']['address_line']}"
         store_items_available = item['items_available']
         store_items_available_text = f"🥡 {item['items_available']}"
-        item_price_code = self.__format_price_code(item['item']['item_price']['code'])
-        item_price = f"💰 {int(item['item']['price_including_taxes']['minor_units']) / 100} {item_price_code}"
+        item_price_string = f"💰 {self.__get_price(item)} -- ({self.__get_value(item)} value)"
 
-        item_text = f"{store_name_text}\n{store_address_line}\n{item_price}\n{store_items_available_text}"
+        item_text = f"{store_name_text}\n{store_address_line}\n{item_price_string}\n{store_items_available_text}"
 
         if store_items_available > 0:
             store_pickup_start = self.__format_datetime(item['pickup_interval']['start'])
@@ -298,13 +335,6 @@ class TooGoodToGo:
                 print(f"[{user_id}] {status} {store_items_available_text} 🍽  {store_name} ({item_id})")
         
         return item_text
-    
-    def __format_price_code(self, price_code: str) -> str:
-        if price_code == 'EUR':
-            return '€'
-        if price_code == 'USD':
-            return '$'
-        return price_code
 
     def format_status(self, status: str) -> str:
         return TooGoodToGo.ITEM_STATUS[status]
