@@ -3,7 +3,7 @@ import time
 
 from pathlib import Path
 from _thread import start_new_thread
-from datetime import datetime
+from datetime import datetime, timedelta
 from pytz import timezone, utc
 from babel.numbers import format_currency
 
@@ -41,7 +41,8 @@ class TooGoodToGo:
             types.BotCommand("/info", "favorite bags currently available"),
             types.BotCommand("/login", "log in with your email"),
             types.BotCommand("/settings", "set when you want to be notified"),
-            types.BotCommand("/help", "short explanation"),
+            types.BotCommand("/help", "Help dialog"),
+            types.BotCommand("/silence", "Silence the bot for a while"),
         ])
     
     def __set_config(self, config: dict):
@@ -350,7 +351,7 @@ class TooGoodToGo:
                     user_settings = self.users_settings_data[user_id]
 
                     # if any alert is enabled for this user
-                    if any(setting == 1 for setting in user_settings.values()):
+                    if not self.is_silenced(user_id) and any(setting == 1 for setting in user_settings.values()):
                         favourite_items = self.get_favourite_items(user_id)
 
                         for item in favourite_items:
@@ -416,6 +417,26 @@ class TooGoodToGo:
                 .replace(tzinfo=utc)
                 .astimezone(self.timezone)
                 .strftime(self.date_format))
+
+    def silence_for_user(self, chat_id, minutes=0, hours=0, days=0):
+        now = datetime.now()
+        exp = now + timedelta(minutes=minutes, hours=hours, days=days)
+
+        self.users_settings_data[chat_id]['silence_exp'] = exp.isoformat()
+        self.save_users_settings_data_to_txt()
+
+
+    def is_silenced(self, chat_id):
+        silence_exp_string = self.users_settings_data[chat_id].get('silence_exp')
+        if silence_exp_string is None:
+            return False
+        silence_exp = datetime.fromisoformat(silence_exp_string)
+        if silence_exp < datetime.now():
+            print(f"{chat_id} Silence has expired. Exp: {silence_exp_string}")
+            del self.users_settings_data[chat_id]['silence_exp']
+            self.save_users_settings_data_to_txt()
+            return False
+        return True
 
 
 def data_file(data_file_name: str, data_folder='data', extension='json') -> Path:

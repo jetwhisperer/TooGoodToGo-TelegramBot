@@ -203,6 +203,13 @@ async def back_callback(call: types.CallbackQuery):
     await bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                         reply_markup=inline_keyboard_markup(chat_id))
 
+
+@bot.message_handler(commands=['silence'])
+async def silence(message):
+    chat_id = str(message.chat.id)
+    tooGoodToGo.silence_for_user(chat_id, minutes=30)
+    # TODO: add configurability
+
 print('TooGoodToGo bot started')
 while True:
     try:
