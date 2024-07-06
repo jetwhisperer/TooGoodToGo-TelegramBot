@@ -136,7 +136,7 @@ async def send_settings(message):
     credentials = tooGoodToGo.find_credentials_by_telegramUserID(chat_id)
     if credentials is None:
         await bot.send_message(chat_id=chat_id,
-                               text="🔑 You have to log in with your mail first!\nPlease enter */login email@example.com*\n*❗️️This is necessary if you want to use the bot❗️*",
+                               text="🔑 You have to log in with your email first!\nPlease enter */login email@example.com*\n*❗️️This is necessary if you want to use the bot❗️*",
                                parse_mode="Markdown")
         return None
 
@@ -204,5 +204,13 @@ async def back_callback(call: types.CallbackQuery):
                                         reply_markup=inline_keyboard_markup(chat_id))
 
 print('TooGoodToGo bot started')
-
-asyncio.run(bot.polling())
+while True:
+    try:
+        asyncio.run(bot.polling())
+    except KeyboardInterrupt:
+        print("Keyboard interrupt received. Shutting Down")
+        break
+    except Exception as e:
+        print("An Exception occurred: ", e)
+        with open("exceptions.log", 'a') as exfile:
+            print("An Exception occurred: ", e, file=exfile)
