@@ -1,5 +1,6 @@
 import json
 import time
+from configparser import SectionProxy
 
 from pathlib import Path
 from _thread import start_new_thread
@@ -26,7 +27,7 @@ class TooGoodToGo:
     available_items_favorites = {}
     connected_clients = {}
 
-    def __init__(self, bot_token: str, config: dict = {}):
+    def __init__(self, bot_token: str, config: SectionProxy = {}):
         self.bot = TeleBot(bot_token)
 
         self.__set_config(config)
@@ -42,10 +43,10 @@ class TooGoodToGo:
             types.BotCommand("/login", "log in with your email"),
             types.BotCommand("/settings", "set when you want to be notified"),
             types.BotCommand("/help", "Help dialog"),
-            types.BotCommand("/silence", "Silence the bot for a while"),
+            types.BotCommand("/sleep", "Silence the bot for a while"),
         ])
     
-    def __set_config(self, config: dict):
+    def __set_config(self, config: SectionProxy):
         self.timezone = timezone(config.get('timezone', 'UTC'))
         print('timezone', self.timezone)
 
@@ -418,9 +419,9 @@ class TooGoodToGo:
                 .astimezone(self.timezone)
                 .strftime(self.date_format))
 
-    def silence_for_user(self, chat_id, minutes=0, hours=0, days=0):
+    def silence_for_user(self, chat_id, secs=0, minutes=0, hours=0, days=0):
         now = datetime.now()
-        exp = now + timedelta(minutes=minutes, hours=hours, days=days)
+        exp = now + timedelta(seconds=secs, minutes=minutes, hours=hours, days=days)
 
         self.users_settings_data[chat_id]['silence_exp'] = exp.isoformat()
         self.save_users_settings_data_to_txt()
